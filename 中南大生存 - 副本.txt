@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=2.0">
+    <title>南湖拾荒记 · 中南大期末周生存</title>
+    <style>
+        :root {
+            --bg: #e6f7f2;
+            --surface: #ffffff;
+            --border: #b2d8d8;
+            --text: #1b4332;
+            --text-light: #2d6a4f;
+            --accent: #4da87c;
+            --accent-light: #7ec8a5;
+            --water: #06d6a0;
+            --lake: #118ab2;
+            --sun: #ffd166;
+            --warn: #ef476f;
+            --shadow: 0 4px 12px rgba(0,0,0,0.06);
+            --pixel-border: 3px solid var(--border);
+            --font-main: 'Courier New', 'SimHei', 'PingFang SC', monospace;
+            --font-text: 'Courier New', 'SimHei', 'PingFang SC', monospace;
+            --scanline: rgba(255,255,255,0.03);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #d6eef5 0%, #e6f7f2 50%, #f0f7e6 100%);
+            background-attachment: fixed;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: var(--font-text);
+            padding: 10px;
+            position: relative;
+            image-rendering: pixelated;
+            -webkit-font-smoothing: none;
+        }
+
+        /* 像素化装饰背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.012) 3px, rgba(0,0,0,0.012) 4px),
+                radial-gradient(ellipse at 20% 80%, rgba(6,214,160,0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(17,138,178,0.08) 0%, transparent 50%);
+            opacity: 0.7;
+        }
+
+        .game-wrapper {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 750px;
+            background: var(--surface);
+            border: 6px solid var(--border);
+            box-shadow: 0 0 0 4px #cce8e0, 0 10px 30px rgba(0,0,0,0.1), inset 0 0 40px rgba(6,214,160,0.06);
+            border-radius: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        /* 状态栏 */
+        .status-bar {
+            background: #f4fdf9;
+            border-bottom: 3px solid var(--accent-light);
+            padding: 8px 14px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-main);
+            font-size: 9px;
+            color: var(--text);
+            letter-spacing: 0.5px;
+            background-image: repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(0,0,0,0.01) 6px, rgba(0,0,0,0.01) 8px);
+        }
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            background: #ffffff;
+            padding: 2px 8px;
+            border: 2px solid var(--border);
+            box-shadow: 1px 1px 0 rgba(0,0,0,0.05);
+            white-space: nowrap;
+        }
+        .stat-item.small {
+            font-size: 8px;
+            padding: 2px 6px;
+        }
+        .stat-icon {
+            font-size: 14px;
+        }
+        .location-tag {
+            background: var(--accent);
+            color: white;
+            padding: 2px 8px;
+            border: 2px solid #2d6a4f;
+            font-size: 8px;
+            white-space: nowrap;
+            letter-spacing: 0.3px;
+        }
+
+        /* 场景画面区 */
+        .scene-area {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            background: #c9e8df;
+            background-image:
+                linear-gradient(180deg, #b8dce8 0%, #d4eed8 60%, #e6f7f2 100%);
+            overflow: hidden;
+            border-bottom: 4px solid var(--accent-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.5s;
+        }
+        .scene-pixel-art {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            font-size: 0;
+        }
+        /* 像素场景元素 */
+        .pixel-building {
+            position: absolute;
+            background: #b0d4c0;
+            border: 3px solid #5e8b6f;
+            box-shadow: inset 0 0 0 2px #7da88a;
+        }
+        .pixel-tree {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 12px solid transparent;
+            border-right: 12px solid transparent;
+            border-bottom: 24px solid #6b9e78;
+            filter: drop-shadow(2px 2px 0 #4a7c59);
+        }
+        .pixel-water {
+            position: absolute;
+            background: linear-gradient(180deg, #8ed6e0, #5eb5c4);
+            border-top: 4px solid #b3e3eb;
+            animation: waterShimmer 3s infinite steps(4);
+        }
+        @keyframes waterShimmer {
+            0% { background-position: 0 0; }
+            50% { background-position: 6px 2px; }
+            100% { background-position: 0 0; }
+        }
+        .pixel-sun {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            background: #ffd166;
+            border: 3px solid #e0a800;
+            box-shadow: 0 0 20px #ffb703;
+            animation: sunPulse 4s infinite steps(8);
+        }
+        @keyframes sunPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+            100% { transform: scale(1); }
+        }
+        .scene-label {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.85);
+            border: 3px solid var(--accent);
+            padding: 4px 12px;
+            font-family: var(--font-main);
+            font-size: 9px;
+            color: var(--text);
+            white-space: nowrap;
+            z-index: 5;
+        }
+        /* 文三水彩蛋 */
+        .wensanshui {
+            position: absolute;
+            font-size: 32px;
+            animation: bounce 1.5s infinite steps(6);
+            cursor: pointer;
+            z-index: 10;
+            filter: drop-shadow(0 4px 4px rgba(0,0,0,0.2));
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* 对话框 */
+        .dialog-box {
+            background: #ffffff;
+            margin: 0;
+            padding: 14px 16px;
+            border-top: 3px solid var(--accent-light);
+            font-family: var(--font-text);
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text);
+            min-height: 90px;
+            position: relative;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.03);
+        }
+        .dialog-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .narrator {
+            color: #2d6a4f;
+            font-style: italic;
+        }
+        .highlight {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        /* 选项区 */
+        .choices-area {
+            background: #f8fdfa;
+            padding: 10px 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            border-top: 2px dashed var(--accent-light);
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .choice-btn {
+            font-family: var(--font-main);
+            font-size: 10px;
+            background: #e6f7f2;
+            border: 3px solid var(--accent);
+            color: var(--text);
+            padding: 10px 14px;
+            cursor: pointer;
+            box-shadow: 2px 2px 0 #b2d8d8;
+            transition: all 0.05s steps(1);
+            flex: 1 1 45%;
+            min-width: 140px;
+            text-align: left;
+            letter-spacing: 0.3px;
+            position: relative;
+        }
+        .choice-btn:hover {
+            background: #d0f0e3;
+            border-color: #2d6a4f;
+            box-shadow: 3px 3px 0 #8fbc8f;
+            transform: translate(-1px,-1px);
+        }
+        .choice-btn:active {
+            background: #b8e0cc;
+            box-shadow: 1px 1px 0 #8fbc8f;
+            transform: translate(1px,1px);
+        }
+        .choice-btn.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+            filter: grayscale(20%);
+        }
+        .btn-icon {
+            font-size: 16px;
+            margin-right: 4px;
+        }
+        .btn-hint {
+            display: block;
+            font-size: 7px;
+            color: #5e8b6f;
+            margin-top: 3px;
+        }
+
+        /* 背包面板 */
+        .backpack-panel {
+            display: none;
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255,255,255,0.97);
+            border: 4px solid var(--accent);
+            padding: 14px;
+            width: 240px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 20;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+            font-family: var(--font-main);
+            font-size: 8px;
+        }
+        .backpack-panel h3 {
+            color: var(--accent);
+            margin-bottom: 8px;
+            font-size: 9px;
+        }
+        .backpack-item {
+            border-bottom: 1px dashed var(--border);
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 550px) {
+            .status-bar {
+                font-size: 7px;
+                gap: 4px;
+                padding: 6px 8px;
+            }
+            .stat-item {
+                padding: 1px 4px;
+                font-size: 7px;
+            }
+            .scene-area {
+                height: 160px;
+            }
+            .choice-btn {
+                font-size: 8px;
+                padding: 8px 6px;
+                flex: 1 1 100%;
+            }
+            .dialog-box {
+                font-size: 12px;
+                padding: 10px;
+            }
+        }
+/* 搜索弹窗的遮罩背景 */
+.popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    justify-content: center;
+    align-items: center;
+}
+/* 弹窗主体 */
+.popup-box {
+    background: #ffffff;
+    border: 5px solid #4da87c;
+    padding: 20px;
+    text-align: center;
+    font-family: 'Courier New', 'SimHei', monospace;
+    box-shadow: 0 0 0 4px #cce8e0, 0 10px 30px rgba(0,0,0,0.2);
+    max-width: 320px;
+    width: 80%;
+    animation: popIn 0.2s steps(4);
+}
+@keyframes popIn {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+.popup-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 8px;
+}
+.popup-title {
+    font-size: 14px;
+    color: #1b4332;
+    margin-bottom: 8px;
+}
+.popup-desc {
+    font-size: 12px;
+    color: #2d6a4f;
+    margin-bottom: 12px;
+}
+.popup-btn {
+    font-family: 'Courier New', 'SimHei', monospace;
+    background: #e6f7f2;
+    border: 3px solid #4da87c;
+    padding: 8px 20px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #1b4332;
+    box-shadow: 2px 2px 0 #b2d8d8;
+}
+.popup-btn:hover {
+    background: #d0f0e3;
+}
+    </style>
+</head>
+<body>
+<div class="game-wrapper" id="gameContainer">
+    <!-- 状态栏 -->
+    <div class="status-bar" id="statusBar">
+        <span class="stat-item"><span class="stat-icon">💰</span> <span id="moneyVal">500</span></span>
+        <span class="stat-item"><span class="stat-icon">📚</span> <span id="knowledgeVal">15</span></span>
+        <span class="stat-item"><span class="stat-icon">⚡</span> <span id="energyVal">80</span></span>
+        <span class="stat-item"><span class="stat-icon">💜</span> <span id="mentalityVal">70</span></span>
+        <span class="stat-item small"><span class="stat-icon">🕒</span> 行动:<span id="apVal">4</span></span>
+        <span class="stat-item small"><span class="stat-icon">📅</span> 第<span id="dayVal">1</span>天</span>
+        <span class="location-tag" id="locationTag">📍 五羊广场</span>
+        <button onclick="toggleBackpack()" style="margin-left:auto;font-family:inherit;font-size:8px;background:#e6f7f2;border:2px solid #4da87c;cursor:pointer;padding:2px 6px;">🎒背包</button>
+<!-- 搜索弹窗（默认隐藏） -->
+<div class="popup-overlay" id="searchPopup">
+    <div class="popup-box">
+        <span class="popup-icon" id="popupIcon">📦</span>
+        <div class="popup-title" id="popupTitle">找到物品</div>
+        <div class="popup-desc" id="popupDesc">描述</div>
+        <button class="popup-btn" onclick="closeSearchPopup()">确 定</button>
+    </div>
+</div>
+    </div>
+
+    <!-- 场景画面 -->
+    <div class="scene-area" id="sceneArea">
+        <div class="scene-pixel-art" id="sceneArt"></div>
+        <div class="scene-label" id="sceneLabel">五羊广场</div>
+    </div>
+
+    <!-- 对话框 -->
+    <div class="dialog-box" id="dialogBox">
+        <div class="dialog-text" id="dialogText">欢迎来到中南财经政法大学南湖校区。</div>
+    </div>
+
+    <!-- 选项区 -->
+    <div class="choices-area" id="choicesArea"></div>
+
+    <!-- 背包浮层 -->
+    <div class="backpack-panel" id="backpackPanel">
+        <h3>🎒 拾荒背包</h3>
+        <div id="backpackContent">空空如也</div>
+        <button onclick="toggleBackpack()" style="font-family:inherit;font-size:8px;margin-top:6px;background:#e6f7f2;border:2px solid #4da87c;cursor:pointer;">关闭</button>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- 游戏核心数据 ----------
+        const GameState = {
+            day: 1,
+            maxDays: 7,
+            actionPoints: 4,
+            maxAP: 4,
+            money: 500,
+            knowledge: 15,
+            maxKnowledge: 150,
+            energy: 80,
+            maxEnergy: 100,
+            mentality: 70,
+            maxMentality: 100,
+            currentLocation: 'wuyang_square',
+            backpack: [],
+            maxBackpack: 8,
+            eventFlags: {},
+            wensanshuiFound: 0,
+            gameOver: false,
+            endingTriggered: false,
+        };
+
+        // 地点数据
+        const locations = {
+            wuyang_square: {
+                name: '五羊广场',
+                sceneClass: 'scene-square',
+                desc: '校园最热闹的地带，社团摊位林立，信息集散中心。',
+                actions: ['explore', 'social', 'rest'],
+                exploreItems: [
+                    { name: '社团伴手礼', type: 'food', effect: { energy: 8, mentality: 4 }, desc: '一个小零食包' },
+                    { name: '活动传单', type: 'info', effect: {}, desc: '得知隐藏活动信息' },
+                    { name: '二手教材', type: 'book', effect: { knowledge: 5 }, desc: '低价买到的旧教材' }
+                ]
+            },
+            library: {
+                name: '逸夫图书馆',
+                sceneClass: 'scene-library',
+                desc: '期末兵家必争之地。',
+                actions: ['study', 'explore'],
+                studyBonus: 1.5,
+                exploreItems: [
+                    { name: '过期期刊', type: 'book', effect: { knowledge: 3 }, desc: '学术期刊合订本' },
+                    { name: '学长笔记', type: 'book', effect: { knowledge: 12 }, desc: '手写复习重点', rare: true },
+                    { name: '占座纸条', type: 'special', effect: {}, desc: '一个已预约的座位凭证' }
+                ]
+            },
+            wenbo: {
+                name: '文波楼',
+                sceneClass: 'scene-wenbo',
+                desc: '钟楼所在地，新闻与外语学院所在。',
+                actions: ['study', 'explore', 'social'],
+                studyType: 'language',
+                exploreItems: [
+                    { name: '外语笔记', type: 'book', effect: { knowledge: 6 }, desc: '英语角学习资料' },
+                    { name: '旧报纸', type: 'info', effect: { knowledge: 2 }, desc: '过期校报' }
+                ]
+            },
+            canteen_xiaohu: {
+                name: '晓湖园（五食堂）',
+                sceneClass: 'scene-canteen',
+                desc: '网红食堂，非饭点时也是自习圣地。',
+                actions: ['eat', 'rest', 'explore'],
+                mealCost: 5,
+                mealEnergy: 18,
+                exploreItems: [
+                    { name: '剩饭打包', type: 'food', effect: { energy: 8 }, desc: '免费的食物', risk: '腹泻' },
+                    { name: '奶茶优惠券', type: 'special', effect: { money: -3, energy: 10, mentality: 5 }, desc: '5元换一杯奶茶' }
+                ]
+            },
+            nanhu_road: {
+                name: '南湖跑道',
+                sceneClass: 'scene-lake',
+                desc: '沿湖步道，晨跑夜跑好去处。',
+                actions: ['exercise', 'rest'],
+                exerciseEffect: { energy: 8, mentality: 6 }
+            },
+            xiaonan_lake: {
+                name: '晓南湖',
+                sceneClass: 'scene-lake',
+                desc: '九孔桥横跨，希贤岭在望。',
+                actions: ['rest', 'explore'],
+                restBonus: { mentality: 10, energy: 3 },
+                exploreItems: [
+                    { name: '灵感石头', type: 'special', effect: { knowledge: 3, mentality: 5 }, desc: '湖边捡到的光滑石头' }
+                ]
+            },
+            wentai: {
+                name: '文泰楼',
+                sceneClass: 'scene-wentai',
+                desc: '临于希贤岭，泰然自若。',
+                actions: ['study', 'explore'],
+                studyBonus: 1.2,
+                exploreItems: [
+                    { name: '复习提纲', type: 'book', effect: { knowledge: 8 }, desc: '考试重点整理' }
+                ]
+            },
+            dormitory: {
+                name: '环湖宿舍',
+                sceneClass: 'scene-dorm',
+                desc: '上床下桌四人间，窗外南湖跑道。',
+                actions: ['rest', 'study'],
+                restBonus: { energy: 15, mentality: 3 },
+                studyBonus: 0.8
+            }
+        };
+
+        // 随机事件池
+        const randomEvents = [
+            { id: 'teacher_hint', title: '📋 老师划重点', desc: '教授在群里发了重点范围！', effect: { knowledge: 15, mentality: 5 } },
+            { id: 'roommate_noise', title: '🎮 室友开黑', desc: '宿舍太吵无法复习。', effect: { mentality: -8, energy: -3 } },
+            { id: 'power_out', title: '🔌 突然停电', desc: 'WiFi也没了...', effect: { knowledge: -3, mentality: -6 } },
+            { id: 'classmate_notes', title: '📝 学霸分享笔记', desc: '班里的学霸分享了笔记。', effect: { knowledge: 18, mentality: 3 } },
+            { id: 'family_call', title: '📞 家里来电', desc: '妈妈关心你的近况。', effect: { mentality: 14, energy: 4 } },
+            { id: 'snack_discount', title: '🍜 外卖优惠券', desc: '抢到大额优惠券！', effect: { energy: 12, mentality: 8 } },
+            { id: 'headache', title: '🤒 轻微不适', desc: '连续熬夜的后果。', effect: { energy: -12, mentality: -4 }, condition: ()=>GameState.energy<45 },
+            { id: 'library_full', title: '🏫 图书馆爆满', desc: '座位全满。', effect: { energy: -5, mentality: -5 } },
+            { id: 'lucky_break', title: '🍀 意外发现', desc: '旧笔记本里的复习提纲！', effect: { knowledge: 20, mentality: 8 } },
+            { id: 'rain_day', title: '🌧️ 暴雨倾盆', desc: '无法出门。', effect: { energy: -2, mentality: -6 } },
+        ];
+
+        // 文三水特殊事件
+        const wensanshuiEvent = {
+            title: '🐾 文三水出现！',
+            desc: '中南大的吉祥物突然从角落跳出来，给了你一个小礼物。',
+            effect: { mentality: 8 },
+            gift: () => {
+                const gifts = [
+                    { name: '文三水钥匙扣', type: 'special', desc: '可爱的校园周边', effect: { mentality: 3 } },
+                    { name: '食堂优惠券', type: 'special', desc: '免费一餐', effect: { money: 8 } },
+                    { name: '复习秘籍', type: 'book', desc: '文三水的学习小贴士', effect: { knowledge: 10 } }
+                ];
+                return gifts[Math.floor(Math.random() * gifts.length)];
+            }
+        };
+
+        // 结局判定函数
+        function getEnding() {
+            const k = GameState.knowledge;
+            const e = GameState.energy;
+            const m = GameState.mentality;
+            if (e <= 5) return { grade:'F--', color:'#ef476f', title:'🏥 精力枯竭 · 住院', desc:'你在考试前晕倒在图书馆，被送进校医院。身体是革命的本钱，下学期重修吧。' };
+            if (m <= 10 && k < 60) return { grade:'F', color:'#ef476f', title:'💔 心态崩溃 · 弃考', desc:'巨大压力压垮了你，你没能走进考场。' };
+            if (k >= 135) return { grade:'S', color:'#ffd166', title:'👑 南湖学霸传说', desc:'你以接近满分的成绩碾压全场！奖学金到手，文三水都为你骄傲。' };
+            if (k >= 105) return { grade:'A', color:'#4da87c', title:'🌟 厚德济世 · 优秀', desc:'成绩优异，无愧于校训。可以安心享受假期了。' };
+            if (k >= 75) return { grade:'B', color:'#06d6a0', title:'👍 良好水平', desc:'还算不错，对得起这些天的努力。' };
+            if (k >= 50) return { grade:'C', color:'#ffb703', title:'😅 及格万岁', desc:'低空飞过！不用补考就是胜利。' };
+            return { grade:'F', color:'#ef476f', title:'💀 挂科', desc:'试卷仿佛天书。补考通知会在假期寄到。' };
+        }
+
+        // 工具函数
+        function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+        function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+        function updateStatsUI() {
+            document.getElementById('moneyVal').textContent = GameState.money;
+            document.getElementById('knowledgeVal').textContent = GameState.knowledge;
+            document.getElementById('energyVal').textContent = GameState.energy;
+            document.getElementById('mentalityVal').textContent = GameState.mentality;
+            document.getElementById('apVal').textContent = GameState.actionPoints;
+            document.getElementById('dayVal').textContent = GameState.day;
+            document.getElementById('locationTag').textContent = '📍 ' + (locations[GameState.currentLocation]?.name || '未知');
+        }
+
+        // 绘制场景
+        function renderScene(locationId) {
+            const sceneArt = document.getElementById('sceneArt');
+            const sceneLabel = document.getElementById('sceneLabel');
+            const loc = locations[locationId];
+            sceneLabel.textContent = loc.name;
+            sceneArt.innerHTML = '';
+            // 根据地点生成像素场景元素
+            switch(locationId) {
+                case 'wuyang_square':
+                    sceneArt.innerHTML = `<div class="pixel-sun" style="top:12px;right:30px;"></div>
+                        <div class="pixel-building" style="bottom:20px;left:20px;width:90px;height:80px;background:#c0d8c8;"></div>
+                        <div class="pixel-building" style="bottom:20px;right:30px;width:70px;height:100px;background:#b8d0bc;"></div>
+                        <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);font-size:38px;">🏛️</div>`;
+                    break;
+                case 'library':
+                    sceneArt.innerHTML = `<div class="pixel-building" style="bottom:20px;left:50%;transform:translateX(-50%);width:160px;height:110px;background:#d4e2d8;border:4px solid #5e8b6f;"></div>
+                        <div style="position:absolute;top:30px;left:60px;font-size:24px;">📚</div>`;
+                    break;
+                case 'wenbo':
+                    sceneArt.innerHTML = `<div class="pixel-building" style="bottom:20px;right:40px;width:70px;height:130px;background:#c4d4c0;"></div>
+                        <div style="position:absolute;top:10px;right:50px;font-size:40px;">🕰️</div>`;
+                    break;
+                case 'canteen_xiaohu':
+                    sceneArt.innerHTML = `<div style="position:absolute;bottom:20px;width:100%;text-align:center;font-size:48px;">🍜</div>`;
+                    break;
+                case 'nanhu_road':
+                case 'xiaonan_lake':
+                    sceneArt.innerHTML = `<div class="pixel-water" style="bottom:0;width:100%;height:80px;"></div>
+                        <div style="position:absolute;top:20px;right:50px;font-size:36px;">🌳</div>`;
+                    break;
+                case 'wentai':
+                    sceneArt.innerHTML = `<div class="pixel-building" style="bottom:20px;left:50px;width:100px;height:90px;background:#c8d8c0;"></div>`;
+                    break;
+                case 'dormitory':
+                    sceneArt.innerHTML = `<div style="position:absolute;bottom:20px;width:100%;text-align:center;font-size:42px;">🛏️</div>`;
+                    break;
+                default: sceneArt.innerHTML = '<div style="font-size:48px;">🏫</div>';
+            }
+            // 随机文三水彩蛋（15%概率）
+            if (Math.random() < 0.15 && !GameState.gameOver) {
+                const ws = document.createElement('div');
+                ws.className = 'wensanshui';
+                ws.textContent = '🐾';
+                ws.style.bottom = '30px';
+                ws.style.left = rand(20, 80) + '%';
+                ws.title = '点击文三水！';
+                ws.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    triggerWensanshui();
+                });
+                sceneArt.appendChild(ws);
+            }
+        }
+
+        function triggerWensanshui() {
+            GameState.wensanshuiFound++;
+            const gift = wensanshuiEvent.gift();
+            if (GameState.backpack.length < GameState.maxBackpack) {
+                GameState.backpack.push(gift);
+            }
+            applyEffect(wensanshuiEvent.effect);
+            let msg = `🐾 文三水突然出现！它送给你【${gift.name}】。${gift.desc}。心态+8。`;
+            if (GameState.wensanshuiFound >= 21) msg += '\n(你已集齐21个彩蛋！解锁隐藏成就)';
+            setDialog(msg);
+            updateStatsUI();
+            renderScene(GameState.currentLocation);
+        }
+
+        function applyEffect(eff) {
+            if (eff.money) GameState.money = clamp(GameState.money + eff.money, 0, 2000);
+            if (eff.knowledge) GameState.knowledge = clamp(GameState.knowledge + eff.knowledge, 0, GameState.maxKnowledge);
+            if (eff.energy) GameState.energy = clamp(GameState.energy + eff.energy, 0, GameState.maxEnergy);
+            if (eff.mentality) GameState.mentality = clamp(GameState.mentality + eff.mentality, 0, GameState.maxMentality);
+        }
+
+        function setDialog(text) {
+            document.getElementById('dialogText').innerHTML = text.replace(/\n/g, '<br>');
+        }
+
+        function clearChoices() {
+            document.getElementById('choicesArea').innerHTML = '';
+        }
+
+        function addChoice(text, callback, hint = '') {
+            const btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            btn.innerHTML = text + (hint ? `<span class="btn-hint">${hint}</span>` : '');
+            btn.addEventListener('click', callback);
+            document.getElementById('choicesArea').appendChild(btn);
+        }
+
+        function disableAllChoices() {
+            document.querySelectorAll('.choice-btn').forEach(b => b.classList.add('disabled'));
+        }
+
+        // 消耗行动点并检查结束日
+        function spendAP(amount = 1) {
+            GameState.actionPoints -= amount;
+            updateStatsUI();
+            if (GameState.actionPoints <= 0) {
+                endDay();
+            } else {
+                showLocationActions();
+            }
+        }
+
+        function endDay() {
+            if (GameState.day >= GameState.maxDays) {
+                triggerExam();
+                return;
+            }
+            // 每日随机事件
+            let eventMsg = '';
+            if (Math.random() < 0.5) {
+                const availableEvents = randomEvents.filter(e => !e.condition || e.condition());
+                if (availableEvents.length > 0) {
+                    const ev = availableEvents[Math.floor(Math.random() * availableEvents.length)];
+                    applyEffect(ev.effect);
+                    eventMsg = `\n【随机事件】${ev.title}：${ev.desc}`;
+                }
+            }
+            GameState.day++;
+            GameState.actionPoints = GameState.maxAP;
+            updateStatsUI();
+            setDialog(`🌙 第${GameState.day-1}天结束。你回到宿舍休息。${eventMsg}\n新的一天开始了，行动点已恢复。`);
+            clearChoices();
+            addChoice('继续', () => {
+                setDialog('今天要去哪里呢？');
+                showMapChoices();
+            });
+        }
+
+        function triggerExam() {
+            GameState.gameOver = true;
+            const ending = getEnding();
+            setDialog(`📝 考试日来临！\n你走进考场……\n\n最终成绩：<span style="color:${ending.color};font-size:18px;">${ending.grade}</span>\n${ending.title}\n${ending.desc}\n\n知识:${GameState.knowledge} 精力:${GameState.energy} 心态:${GameState.mentality} 生活费:${GameState.money}`);
+            clearChoices();
+            addChoice('🔄 重新开始', () => { resetGame(); startGame(); });
+        }
+
+        function showMapChoices() {
+            clearChoices();
+            setDialog('选择要去的地点：');
+            for (const [id, loc] of Object.entries(locations)) {
+                addChoice(`${loc.name}`, () => {
+                    GameState.currentLocation = id;
+                    updateStatsUI();
+                    renderScene(id);
+                    setDialog(`你来到了【${loc.name}】。${loc.desc}`);
+                    showLocationActions();
+                }, loc.desc.substring(0,15)+'...');
+            }
+        }
+
+        function showLocationActions() {
+            const loc = locations[GameState.currentLocation];
+            clearChoices();
+            setDialog(`你在【${loc.name}】。剩余行动点：${GameState.actionPoints}。选择行动：`);
+            // 通用行动
+            if (loc.actions.includes('study')) {
+                const bonus = loc.studyBonus || 1.0;
+                const k = Math.floor(rand(8, 16) * bonus);
+                addChoice('📚 学习', () => {
+                    applyEffect({ knowledge: k, energy: -rand(10,18) });
+                    setDialog(`你在${loc.name}认真复习。知识+${k}，精力消耗。`);
+                    spendAP(1);
+                }, `知识+${k}`);
+            }
+            if (loc.actions.includes('eat')) {
+                const cost = loc.mealCost || 8;
+                const en = loc.mealEnergy || 18;
+                addChoice('🍜 吃饭', () => {
+                    if (GameState.money >= cost) {
+                        applyEffect({ money: -cost, energy: en, mentality: 5 });
+                        setDialog(`你在${loc.name}吃了一顿，花费${cost}元。精力+${en}，心态+5。`);
+                    } else {
+                        setDialog('生活费不足！试试拾荒或找便宜食堂。');
+                        return;
+                    }
+                    spendAP(1);
+                }, `花费${cost}元 精力+${en}`);
+            }
+            if (loc.actions.includes('rest')) {
+                const rb = loc.restBonus || { energy: 10, mentality: 5 };
+                addChoice('😴 休息', () => {
+                    applyEffect(rb);
+                    setDialog(`你在${loc.name}放松休息。精力+${rb.energy||0}，心态+${rb.mentality||0}。`);
+                    spendAP(1);
+                }, `精力+${rb.energy||0} 心态+${rb.mentality||0}`);
+            }
+            if (loc.actions.includes('social')) {
+                addChoice('💬 社交', () => {
+                    const m = rand(8,18);
+                    applyEffect({ mentality: m, energy: -3 });
+                    setDialog(`你和同学交流讨论，心情舒畅。心态+${m}。`);
+                    spendAP(1);
+                }, `心态提升`);
+            }
+            if (loc.actions.includes('exercise')) {
+                const eff = loc.exerciseEffect || { energy: 8, mentality: 6 };
+                addChoice('🏃 运动', () => {
+                    applyEffect(eff);
+                    setDialog(`你在南湖跑道挥洒汗水。精力+${eff.energy}，心态+${eff.mentality}。`);
+                    spendAP(1);
+                }, `精力+${eff.energy} 心态+${eff.mentality}`);
+            }
+            if (loc.actions.includes('explore')) {
+    addChoice('🔍 探索拾荒', () => {
+        const items = loc.exploreItems;
+        if (items && items.length > 0) {
+            const item = items[Math.floor(Math.random() * items.length)];
+            if (GameState.backpack.length < GameState.maxBackpack) {
+                GameState.backpack.push(item);
+                applyEffect(item.effect || {});
+                // 准备弹窗显示的内容（把风险也加进去）
+                const popupItem = {
+                    name: item.name,
+                    desc: item.desc + (item.risk ? ' (注意：可能有' + item.risk + '风险)' : '')
+                };
+                showSearchPopup(popupItem);  // 用弹窗展示
+            } else {
+                setDialog('背包已满，无法拾取更多物品。');
+            }
+        } else {
+            setDialog('这里没什么可捡的。');
+        }
+        spendAP(1);
+    }, '随机获得物品（弹窗提示）');
+}
+            addChoice('🗺️ 返回地图', showMapChoices, '更换地点');
+        }
+
+        function toggleBackpack() {
+            const panel = document.getElementById('backpackPanel');
+            if (panel.style.display === 'block') {
+                panel.style.display = 'none';
+            } else {
+                const content = document.getElementById('backpackContent');
+                if (GameState.backpack.length === 0) {
+                    content.innerHTML = '空空如也';
+                } else {
+                    content.innerHTML = GameState.backpack.map((item, idx) =>
+                        `<div class="backpack-item">📦 ${item.name} - ${item.desc || ''}</div>`
+                    ).join('');
+                }
+                panel.style.display = 'block';
+            }
+        }
+
+        function resetGame() {
+            GameState.day = 1;
+            GameState.actionPoints = 4;
+            GameState.money = 500;
+            GameState.knowledge = 15;
+            GameState.energy = 80;
+            GameState.mentality = 70;
+            GameState.currentLocation = 'wuyang_square';
+            GameState.backpack = [];
+            GameState.wensanshuiFound = 0;
+            GameState.gameOver = false;
+            GameState.endingTriggered = false;
+            updateStatsUI();
+            renderScene('wuyang_square');
+            clearChoices();
+            document.getElementById('backpackPanel').style.display = 'none';
+        }
+
+        function startGame() {
+            document.getElementById('sceneArt').innerHTML = '<img src="images/wensanshui.png" style="width:100%;height:100%;object-fit:contain;display:block;position:relative;animation: bounce 1.5s infinite steps(6);">';
+            document.getElementById('sceneLabel').textContent = '文三水';
+            setDialog('🐾 文三水：欢迎来到中南财经政法大学！\n博文明理，厚德济世。\n在这个期末周，你不仅要复习考试，还得想办法活下去……\n生活费剩余500元，知识储备堪忧。\n在7天内，探索南湖校区，拾荒求生，冲刺期末！');
+            clearChoices();
+            addChoice('开始生存', () => {
+                setDialog('第一天，你站在五羊广场。阳光正好。');
+                showMapChoices();
+            });
+        }
+
+        // 初始化
+        window.addEventListener('load', () => {
+            updateStatsUI();
+            renderScene('wuyang_square');
+            startGame();
+        });
+
+        // 暴露到全局
+        window.toggleBackpack = toggleBackpack;
+// 显示搜索弹窗
+function showSearchPopup(item) {
+    document.getElementById('popupIcon').textContent = '📦';
+    document.getElementById('popupTitle').textContent = '找到了：' + item.name;
+    document.getElementById('popupDesc').textContent = item.desc;
+    document.getElementById('searchPopup').style.display = 'flex';
+}
+
+// 关闭搜索弹窗
+function closeSearchPopup() {
+    document.getElementById('searchPopup').style.display = 'none';
+}
+window.showSearchPopup = showSearchPopup;
+window.closeSearchPopup = closeSearchPopup;
+    })();
+</script>
+</body>
+</html>
